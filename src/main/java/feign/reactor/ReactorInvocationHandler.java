@@ -3,7 +3,6 @@ package feign.reactor;
 
 import feign.InvocationHandlerFactory.MethodHandler;
 import feign.Target;
-import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -28,6 +27,7 @@ final class ReactorInvocationHandler implements InvocationHandler {
 
     @Override
     public Object invoke(final Object proxy, final Method method, final Object[] args) throws Throwable {
+        // handling standard object methods
         if ("equals".equals(method.getName())) {
             try {
                 boolean hasArgs = args.length > 0 && args[0] != null;
@@ -42,15 +42,16 @@ final class ReactorInvocationHandler implements InvocationHandler {
             return toString();
         }
 
+        // dealing with Reactor types
         Class<?> returnType = method.getReturnType();
-        if (Flux.class.isAssignableFrom(returnType)) {
-            return Flux.from(createMono(method, args));
-        } else if (Mono.class.isAssignableFrom(returnType) ||
-                Publisher.class.isAssignableFrom(returnType)) {
+        if (Mono.class.isAssignableFrom(returnType)) {
             return createMono(method, args);
+        } else if (Flux.class.isAssignableFrom(returnType)) {
+            return Flux.from(createMono(method, args));
         } else if (CompletableFuture.class.isAssignableFrom(returnType)) {
             return createMono(method, args).toFuture();
         }
+        // Default case
         return this.dispatch.get(method).invoke(args);
     }
 

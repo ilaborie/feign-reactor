@@ -2,7 +2,6 @@ package feign.reactor;
 
 import feign.Contract;
 import feign.MethodMetadata;
-import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -10,45 +9,43 @@ import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.UnaryOperator;
 
 import static feign.Util.resolveLastTypeParameter;
+import static java.util.stream.Collectors.toList;
 
 /**
- * This special cases methods that return {@link Flux}, {@link Mono}, {@link Publisher}, or {@link CompletableFuture} so that they
+ * This special cases methods that return {@link Flux}, {@link Mono}, or {@link CompletableFuture} so that they
  * are decoded properly.
  * <p>
  * <p>For example, {@literal Mono<Foo>} and {@literal CompletableFuture<Foo>} will decode {@code Foo}.
  */
-public final class ReactorDelegatingContract implements Contract {
+final class ReactorDelegatingContract implements Contract {
 
     private final Contract delegate;
 
-    public ReactorDelegatingContract(Contract delegate) {
+    ReactorDelegatingContract(Contract delegate) {
         this.delegate = delegate;
     }
 
     @Override
     public List<MethodMetadata> parseAndValidatateMetadata(Class<?> targetType) {
-        List<MethodMetadata> metadatas = this.delegate.parseAndValidatateMetadata(targetType);
+        return this.delegate.parseAndValidatateMetadata(targetType).stream()
+                .map(handleParametrizedType(Flux.class))
+                .map(handleParametrizedType(Mono.class))
+                .map(handleParametrizedType(CompletableFuture.class))
+                .collect(toList());
+    }
 
-        for (MethodMetadata metadata : metadatas) {
+    private UnaryOperator<MethodMetadata> handleParametrizedType(Class<?> clazz) {
+        return metadata -> {
             Type type = metadata.returnType();
-
-            if (type instanceof ParameterizedType && ((ParameterizedType) type).getRawType().equals(Mono.class)) {
-                Type actualType = resolveLastTypeParameter(type, Mono.class);
-                metadata.returnType(actualType);
-            } else if (type instanceof ParameterizedType && ((ParameterizedType) type).getRawType().equals(Flux.class)) {
-                Type actualType = resolveLastTypeParameter(type, Flux.class);
-                metadata.returnType(actualType);
-            } else if (type instanceof ParameterizedType && ((ParameterizedType) type).getRawType().equals(Publisher.class)) {
-                Type actualType = resolveLastTypeParameter(type, Publisher.class);
-                metadata.returnType(actualType);
-            } else if (type instanceof ParameterizedType && ((ParameterizedType) type).getRawType().equals(CompletableFuture.class)) {
-                Type actualType = resolveLastTypeParameter(type, CompletableFuture.class);
+            if (type instanceof ParameterizedType &&
+                    ((ParameterizedType) type).getRawType().equals(clazz)) {
+                Type actualType = resolveLastTypeParameter(type, clazz);
                 metadata.returnType(actualType);
             }
-        }
-
-        return metadatas;
+            return metadata;
+        };
     }
 }

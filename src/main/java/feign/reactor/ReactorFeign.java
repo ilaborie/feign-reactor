@@ -19,10 +19,9 @@ public final class ReactorFeign {
 
         private Contract contract = new Contract.Default();
 
-
         @Override
         public Feign.Builder invocationHandlerFactory(InvocationHandlerFactory invocationHandlerFactory) {
-            throw new UnsupportedOperationException();
+            throw new UnsupportedOperationException("A custom InvocationHandler is already used internaly");
         }
 
         @Override
@@ -38,7 +37,7 @@ public final class ReactorFeign {
             return super.build();
         }
 
-        // Covariant overrides to support chaining to new fallback method.
+        // Covariant overrides to support chaining method.
         @Override
         public Builder logLevel(Logger.Level logLevel) {
             return (Builder) super.logLevel(logLevel);
